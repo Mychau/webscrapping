@@ -1,0 +1,62 @@
+---
+title: "Webscrapping_BAN"
+output: html_document
+---
+
+#Objectif: télécharger les fichiers d'adresse BAN
+https://adresse.data.gouv.fr/data/BAN_licence_gratuite_repartage.zip
+
+```{r}
+if (!require("pacman")) install.packages("pacman")#installe et charge tous les packages requis
+pacman::p_load("rvest", "curl", "stringr")
+```
+
+
+#URL des fichiers
+```{r}
+URL="http://bano.openstreetmap.fr/BAN_odbl/"#url de la page
+download.file(URL, destfile = "scrapedpage.html", quiet=TRUE)#downloader la page HTML
+```
+
+#Lire le nom des fichiers
+```{r}
+webpage <- read_html("scrapedpage.html")#lire la page HTML
+```
+
+#Trouver les liens et downloader les shapes par département
+```{r}
+getwd()
+BAN.dir="~/fichiers_base/BAN_files_points" 
+
+if(!exists(BAN.dir)){#créer le dossier pour stocker shapes s'il n'existe pas
+dir.create(BAN.dir)
+}
+
+#print(dir.name)
+
+root_url="http://bano.openstreetmap.fr/BAN_odbl/" #URL source des fichiers
+links=webpage %>%
+  html_nodes("a") %>%       # trouver les liens
+  html_attr("href") %>%     # obtenir l'url
+  str_subset("\\.zip") #%>% # obtenir les noms en zip
+
+all_links=c()
+for(value in links){
+  all_links=c(all_links,paste(root_url,value,sep=""))#stocker les liens des zip dans un vectors
+}
+
+setwd(BAN.dir)
+
+  count=1
+for(value in all_links){ #pour tous les fichiers zip recensés
+  destfile=as.character(links[count])#nom du fichier
+  temp2 <- gregexpr("[0-9]+", destfile)#vérifier qu'il y a un nombre dedans pour ne pas charger le gros fichier qui aggrege tous les départements
+  if(length(temp2)!=0){#si ce n'est pas le gros fichier (pas de n° de dep dedans)
+    if(exists(destfile)){#si le fichier existe déjà, le supprimer
+      file.remove(destfile)
+    }
+  download.file(value,destfile)}#downloader le fichier
+  count=count+1
+}
+```
+https://adresse.data.gouv.fr/data/BAN_licence_gratuite_repartage.zip
