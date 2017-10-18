@@ -1,0 +1,103 @@
+---
+title: "batis_data_gouv"
+output: html_document
+---
+#Objectif: télécharger les batis du cadastre
+```{r}
+if (!require("pacman")) install.packages("pacman")#installe et charge tous les packages requis
+pacman::p_load("rvest", "curl", "stringr","XML")
+
+```
+
+#Dossier d'enregistrement
+```{r}
+enr="~/batis"
+if(!dir.exists(enr)){
+  dir.create(enr)
+}
+```
+
+
+#Obtenir la liste des dpt
+#Définir URL
+```{r}
+base="https://cadastre.data.gouv.fr/data/etalab-cadastre/2017-07-06/geojson/communes/"
+```
+
+#Télécharger page
+```{r}
+#Télécharger page base
+download.file(base, destfile = "dpts.html", quiet=TRUE)#downloader la page HTML
+
+#Lire page
+webpage <- read_html("dpts.html")
+
+
+#Trouver tous les dpts dans la page
+root_url=base #URL source des fichiers
+liste_dpts=webpage %>%
+  html_nodes("a") %>%       # trouver les liens
+  html_attr("href")  %>%   # obtenir l'url
+  str_subset("\\/")
+
+liste_dpts=sub("\\/.*", "",liste_dpts )
+liste_dpts=liste_dpts[2:length(liste_dpts)]
+```
+
+#Pour chaque département, charger les shapes des villes
+```{r}
+missing_bat=c()
+for(value in liste_dpts){#pour chaque département
+
+
+bati.dir=value 
+path=paste0(enr,"/",value)
+
+if(!exists(path)){#créer un répertoire par département
+  dir.create(path)
+}
+setwd(path)
+
+URL=paste0(base,value)#obtenir URL par dpt
+download.file(URL, destfile = "insee.html", quiet=TRUE)#enregistrer HTML dpt
+webpage <- read_html("insee.html")
+
+
+#Obtenir tous les liens insee
+
+liste_insee=webpage %>%
+  html_nodes("a") %>%       # trouver les liens
+  html_attr("href")  %>%   # obtenir l'url
+  str_subset("\\/")
+liste_insee=liste_insee[2:length(liste_insee)]#trouver tous les codes insee par département
+
+all_insee=c()
+for(value in liste_insee){
+  all_insee=c(all_insee,paste(URL,value,sep="/"))#créer URL par code insee
+}
+
+#Télécharger pour chaque code insee
+count=1
+for(value in all_insee){ #POur tous les codes insee
+  download.file(value, destfile = "insee_shapes.html", quiet=TRUE)
+  webpage <- read_html("insee_shapes.html")
+  liste_files=webpage %>%
+  html_nodes("a") %>%       # trouver les liens
+  html_attr("href")  %>%   # obtenir l'url
+  str_subset("\\.gz")#obtenir les .gz
+  bati_file=liste_files[grepl("batiments",liste_files)]
+  if(length(bati_file)==0){
+    missing_bat=c(missing_bat,value)
+    next
+  }
+  else{
+  url=paste0(value,bati_file)
+  download.file(url,destfile=bati_file,quiet=TRUE)
+  count=count+1}
+  }
+  
+}
+  
+
+```
+
